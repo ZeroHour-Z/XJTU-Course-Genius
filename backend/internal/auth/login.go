@@ -571,9 +571,38 @@ func GetCaptchaImage(client *resty.Client) ([]byte, error) {
 
 // ── MFA completion (after user verifies code) ──
 
-// CompleteMFALogin finishes login after regular MFA verification.
+// CompleteMFALogin submits the login form to CAS after MFA verification.
+// We must NOT call FullLogin (which calls detectMFA again — CAS has mfaFirstNeed=true
+// so detectMFA always returns need=true, causing an infinite loop).
+// Instead, we directly POST the login form with mfaState, matching browser behavior.
 func CompleteMFALogin(client *resty.Client) error {
-	return followAndRegister(client, baseURL)
+	s := session.Get()
+	fpID := s.FpVisitorID
+	stdlog.Printf("[mfa] CompleteMFALogin: direct POST for %s", s.Account)
+
+	httpClient := client.GetClient()
+
+	// Step 1: GET xkfw → CAS redirect to get fresh execution
+	resp, err := httpClient.Get(baseURL)
+	if err != nil {
+		return fmt.Errorf("访问选课系统失败: %w", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	casURL := resp.Request.URL.String()
+	execution := extractExecution(body)
+	stdlog.Printf("[mfa] CompleteMFALogin: casURL=%s execution=%s", casURL[:80], execution[:40])
+
+	// Step 2: Encrypt password
+	encPwd, _ := EncryptPassword(s.Password)
+
+	// Step 3: POST login form to CAS with mfaState
+	err = postCASRaw(httpClient, casURL, s.Account, encPwd, execution, currentMFA.State, fpID, "", "")
+	if err != nil {
+		return fmt.Errorf("登录提交失败: %w", err)
+	}
+
+	return nil
 }
 
 // FinishSafetyVerifyLogin submits the Safety Verify form after MFA verification.
@@ -845,17 +874,22 @@ func followAndRegister(client *resty.Client, startURL string) error {
 	}))
 
 	for i := 0; i < 10; i++ {
+		stdlog.Printf("[mfa] followAndRegister[%d]: GET %s", i, url)
 		resp, err := client.R().Get(url)
 		if err != nil {
 			return fmt.Errorf("重定向链请求失败: %w", err)
 		}
+		stdlog.Printf("[mfa] followAndRegister[%d]: status=%d url=%s", i, resp.StatusCode(), resp.Request.URL)
 		if resp.StatusCode() != http.StatusFound && resp.StatusCode() != http.StatusMovedPermanently {
 			if resp.StatusCode() == http.StatusOK && strings.Contains(resp.Request.URL, "xkfw.xjtu.edu.cn") {
 				break
 			}
+			body := resp.Body()
+			stdlog.Printf("[mfa] followAndRegister[%d]: not a redirect, body(len=%d) contains_login=%v", i, len(body), strings.Contains(string(body), "login.xjtu.edu.cn"))
 			break
 		}
 		loc := resp.Header().Get("Location")
+		stdlog.Printf("[mfa] followAndRegister[%d]: Location=%s", i, loc)
 		if loc == "" {
 			break
 		}

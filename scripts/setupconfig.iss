@@ -1,8 +1,8 @@
 ; XJTU Course Genius — Inno Setup Script
-; v4.4: captcha retry fix, MFA re-detect, reCAPTCHA pre-check
+; v4.5: captcha retry fix, MFA re-detect, reCAPTCHA pre-check
 
 #define MyAppName "XJTU Course Genius"
-#define MyAppVersion "4.4"
+#define MyAppVersion "4.5"
 #define MyAppPublisher "Hz"
 #define MyAppExeName "xjtu_course_genius.exe"
 

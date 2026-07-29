@@ -150,19 +150,19 @@ func (s *Server) HandleMFAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := session.NewClient()
+	// Save MFA cookies from the client used for Init/Send/Verify before following redirects
+	session.SaveCookiesFromHTTP(s.client.GetClient())
 
 	// Safety Verify flow: submit safety verify form after MFA
 	if auth.IsSafetyVerifyFlow() {
-		if err := auth.FinishSafetyVerifyLogin(client); err != nil {
+		if err := auth.FinishSafetyVerifyLogin(s.client); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "二次认证失败: " + err.Error()})
 			return
 		}
 		auth.ClearMFA()
-		session.SaveCookies(client)
-		client.SetHeader("Token", session.Get().Token)
-		s.client = client
-		s.engine.SetClient(client)
+		session.SaveCookies(s.client)
+		s.client.SetHeader("Token", session.Get().Token)
+		s.engine.SetClient(s.client)
 		writeJSON(w, 200, map[string]interface{}{
 			"success":     true,
 			"studentCode": session.Get().StudentCode,
@@ -171,22 +171,21 @@ func (s *Server) HandleMFAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Regular MFA: follow redirects to register
-	if err := auth.CompleteMFALogin(client); err != nil {
+	// Regular MFA: follow redirects to register (uses s.client with MFA cookies)
+	if err := auth.CompleteMFALogin(s.client); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "MFA验证通过但登录失败: " + err.Error()})
 		return
 	}
 
 	auth.ClearMFA()
-	session.SaveCookies(client)
-		client.SetHeader("Token", session.Get().Token)
-	s.client = client
-		s.engine.SetClient(client)
+	session.SaveCookies(s.client)
+	s.client.SetHeader("Token", session.Get().Token)
+	s.engine.SetClient(s.client)
 
 	writeJSON(w, 200, map[string]interface{}{
 		"success":     true,
 		"studentCode": session.Get().StudentCode,
-			"campus":      session.Get().Campus,
+		"campus":      session.Get().Campus,
 	})
 }
 

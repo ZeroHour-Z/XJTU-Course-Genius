@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	stdlog "log"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -56,10 +57,12 @@ func InitMFA(client *resty.Client, mfaType string) (*MFAInitResult, error) {
 	}
 
 	url := fmt.Sprintf("https://login.xjtu.edu.cn/cas/%s/initByType/%s?state=%s", flow, mfaType, mfaState)
+	stdlog.Printf("[mfa] InitMFA: GET %s", url)
 	resp, err := client.R().Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("MFA初始化失败: %w", err)
 	}
+	stdlog.Printf("[mfa] InitMFA response: status=%d body=%s", resp.StatusCode(), resp.Body())
 
 	var j struct {
 		Code int `json:"code"`
@@ -77,6 +80,7 @@ func InitMFA(client *resty.Client, mfaType string) (*MFAInitResult, error) {
 		return nil, fmt.Errorf("MFA初始化失败: code=%d", j.Code)
 	}
 
+	stdlog.Printf("[mfa] InitMFA OK: gid=%s attestServer=%s phone=%s email=%s", j.Data.GID, j.Data.AttestServerURL, j.Data.SecurePhone, j.Data.SecureEmail)
 	currentMFA = &MFAInfo{
 		Type:            mfaType,
 		State:           mfaState,
@@ -101,11 +105,15 @@ func SendMFACode(client *resty.Client) error {
 		return fmt.Errorf("MFA未初始化")
 	}
 	url := fmt.Sprintf("%s/api/guard/%s/send", currentMFA.AttestServerURL, currentMFA.Type)
-	data := map[string]string{"gid": currentMFA.GID}
-	resp, err := client.R().SetBody(data).Post(url)
+	stdlog.Printf("[mfa] SendMFACode: POST %s gid=%s", url, currentMFA.GID)
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]string{"gid": currentMFA.GID}).
+		Post(url)
 	if err != nil {
 		return fmt.Errorf("发送验证码失败: %w", err)
 	}
+	stdlog.Printf("[mfa] SendMFACode response: status=%d body=%s", resp.StatusCode(), resp.Body())
 	var j struct {
 		Code int `json:"code"`
 		Data struct {
@@ -132,21 +140,32 @@ func VerifyMFACode(client *resty.Client, code string) error {
 		return fmt.Errorf("MFA未初始化")
 	}
 	url := fmt.Sprintf("%s/api/guard/%s/valid", currentMFA.AttestServerURL, currentMFA.Type)
-	data := map[string]string{"gid": currentMFA.GID, "code": code}
-	resp, err := client.R().SetBody(data).Post(url)
+	stdlog.Printf("[mfa] VerifyMFACode: POST %s gid=%s code=%s", url, currentMFA.GID, code)
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]string{"gid": currentMFA.GID, "code": code}).
+		Post(url)
 	if err != nil {
 		return fmt.Errorf("验证码校验失败: %w", err)
 	}
+	stdlog.Printf("[mfa] VerifyMFACode response: status=%d body=%s", resp.StatusCode(), resp.Body())
 	var j struct {
 		Code int `json:"code"`
 		Data struct {
-			Status int `json:"status"`
+			Status interface{} `json:"status"` // can be int 2 or string "2"
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp.Body(), &j); err != nil {
 		return fmt.Errorf("解析验证响应失败: %w", err)
 	}
-	if j.Code == 0 && j.Data.Status == 2 {
+	statusOK := false
+	switch v := j.Data.Status.(type) {
+	case float64:
+		statusOK = v == 2
+	case string:
+		statusOK = v == "2"
+	}
+	if j.Code == 0 && statusOK {
 		return nil
 	}
 	return fmt.Errorf("验证码错误")

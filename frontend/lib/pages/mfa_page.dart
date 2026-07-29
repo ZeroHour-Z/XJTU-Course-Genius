@@ -102,7 +102,7 @@ class _MfaPageState extends State<MfaPage> {
       await widget.api.mfaVerify(code);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      _showError('验证码错误');
+      _showError(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
