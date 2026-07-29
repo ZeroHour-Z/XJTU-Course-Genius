@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $d = "${env:ProgramFiles(x86)}\Inno Setup 6\Languages"
-          Invoke-WebRequest "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile "$d\ChineseSimplified.isl"
+          Invoke-WebRequest "https://cdn.jsdelivr.net/gh/kira-96/Inno-Setup-Chinese-Simplified-Translation@main/ChineseSimplified.isl" -OutFile "$d\ChineseSimplified.isl"
       - name: Build installer
         shell: bash
         run: iscc scripts/setupconfig.iss
