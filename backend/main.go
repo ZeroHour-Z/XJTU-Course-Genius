@@ -8,16 +8,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"xjtu-course-genius/internal/api"
+	"xjtu-course-genius/internal/config"
 )
 
 func setupLogging() *os.File {
 	// Write log to config directory, not the executable directory
 	// (on macOS, the .app bundle is read-only under sandbox)
-	dir := configDir()
+	dir := config.Dir()
 	os.MkdirAll(dir, 0755)
 	path := filepath.Join(dir, "xjtu-genius.log")
 
@@ -32,27 +32,27 @@ func setupLogging() *os.File {
 	return f
 }
 
-func configDir() string {
-	var dir string
-	switch runtime.GOOS {
-	case "windows":
-		dir = os.Getenv("APPDATA")
-		if dir == "" {
-			dir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
-		}
-	case "darwin":
-		dir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
-	default:
-		dir = os.Getenv("XDG_CONFIG_HOME")
-		if dir == "" {
-			dir = filepath.Join(os.Getenv("HOME"), ".config")
-		}
-	}
-	return filepath.Join(dir, "xjtu-genius")
-}
+// func configDir() string {
+// 	var dir string
+// 	switch runtime.GOOS {
+// 	case "windows":
+// 		dir = os.Getenv("APPDATA")
+// 		if dir == "" {
+// 			dir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
+// 		}
+// 	case "darwin":
+// 		dir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
+// 	default:
+// 		dir = os.Getenv("XDG_CONFIG_HOME")
+// 		if dir == "" {
+// 			dir = filepath.Join(os.Getenv("HOME"), ".config")
+// 		}
+// 	}
+// 	return filepath.Join(dir, "xjtu-genius")
+// }
 
 func writePortFile(port string) {
-	dir := configDir()
+	dir := config.Dir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		log.Printf("[main] failed to create config dir: %v", err)
 		return
