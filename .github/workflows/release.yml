@@ -47,14 +47,22 @@ jobs:
         with:
           go-version: '1.22'
           cache-dependency-path: backend/go.sum
-      - run: |
+      - name: Build backend
+        run: |
           cd backend
           GOOS=${{ matrix.goos }} GOARCH=amd64 \
             go build -ldflags "-s -w" -o xjtu-genius${{ matrix.ext }} .
+          # macOS also ships Apple Silicon; the arm64 slice is merged into a
+          # universal binary by the macos job, which has lipo.
+          if [ "${{ matrix.goos }}" = "darwin" ]; then
+            GOOS=darwin GOARCH=arm64 \
+              go build -ldflags "-s -w" -o xjtu-genius-arm64 .
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: backend-${{ matrix.target }}
-          path: backend/xjtu-genius${{ matrix.ext }}
+          path: backend/xjtu-genius*
+          if-no-files-found: error
 
   # ── Windows ──
   build-windows:
@@ -177,7 +185,16 @@ jobs:
         with: { channel: stable, flutter-version: '3.44.1' }
       - uses: actions/download-artifact@v4
         with: { name: backend-macos, path: backend/ }
-      - run: chmod +x backend/xjtu-genius
+      - name: Merge backend into universal binary
+        run: |
+          cd backend
+          # Ship one binary that runs natively on both Intel and Apple Silicon,
+          # so Apple Silicon users don't need Rosetta to run the backend.
+          lipo -create -output xjtu-genius-universal xjtu-genius xjtu-genius-arm64
+          mv xjtu-genius-universal xjtu-genius
+          rm xjtu-genius-arm64
+          chmod +x xjtu-genius
+          lipo -info xjtu-genius
       - name: Build Flutter
         run: cd frontend && flutter build macos --release
       - name: Package .dmg
