@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 
 const _channel = MethodChannel('com.xjtu.genius/ime');
 
-/// Width reserved for the native macOS traff-light buttons, which are drawn by
+/// Width reserved for the native macOS traffic-light buttons, which are drawn by
 /// AppKit over our title bar (the window uses fullSizeContentView).
 const double _macTrafficLightsWidth = 78;
 
