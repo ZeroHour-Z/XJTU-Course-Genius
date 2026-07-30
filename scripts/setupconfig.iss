@@ -1,8 +1,8 @@
 ; XJTU Course Genius — Inno Setup Script
-; v4.5: captcha retry fix, MFA re-detect, reCAPTCHA pre-check
+; v4.5.1: macOS config persistence, title bar, entitlements, universal backend
 
 #define MyAppName "XJTU Course Genius"
-#define MyAppVersion "4.5"
+#define MyAppVersion "4.5.1"
 #define MyAppPublisher "Hz"
 #define MyAppExeName "xjtu_course_genius.exe"
 
