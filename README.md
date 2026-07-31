@@ -75,6 +75,18 @@ flutter run -d windows  # 或 linux / macos
 - [后端 README](backend/README.md) — Go 后端架构、CAS 登录流程、API 文档、编译部署
 - [前端 README](frontend/README.md) — Flutter 前端架构、UI 组件、IME 实现、平台适配
 
+## 数据文件位置
+
+应用运行时的配置文件、日志和端口信息存储在用户目录下。**卸载不会自动清除这些文件**，如需彻底清理请手动删除：
+
+| 平台 | 数据目录 |
+|------|---------|
+| Windows | `%APPDATA%\xjtu-genius\`（即 `C:\Users\你的用户名\AppData\Roaming\xjtu-genius\`） |
+| macOS | `~/Library/Application Support/xjtu-genius/` |
+| Linux | `~/.config/xjtu-genius/` |
+
+目录下包含 `config.json`（选课志愿）、`xjtu-genius.log`（日志）、`port`（端口号）。
+
 ## 技术选型
 
 | 层 | 技术 | 原因 |

@@ -1,8 +1,8 @@
 ; XJTU Course Genius — Inno Setup Script
-; v4.5.1: macOS config persistence, title bar, entitlements, universal backend
+; v4.5.2: Windows config to %APPDATA%, data dir docs
 
 #define MyAppName "XJTU Course Genius"
-#define MyAppVersion "4.5.1"
+#define MyAppVersion "4.5.2"
 #define MyAppPublisher "Hz"
 #define MyAppExeName "xjtu_course_genius.exe"
 
