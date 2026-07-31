@@ -55,7 +55,7 @@ func exeConfigPath() string {
 // Windows and Linux keep it beside the executable
 // macOS cannot: the .app bundle is read-only under sandbox
 func configPath() string {
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		return filepath.Join(Dir(), "config.json")
 	}
 	if p := exeConfigPath(); p != "" {
