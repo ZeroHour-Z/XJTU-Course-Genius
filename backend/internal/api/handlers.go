@@ -109,6 +109,7 @@ func (s *Server) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	session.SaveCookiesFromHTTP(client.GetClient())
 	s.client = client
 		s.engine.SetClient(client)
+	session.EnableAutoRelogin(s.client, func(c *resty.Client) error { return auth.ReloginIfNeeded(c) })
 
 	writeJSON(w, 200, map[string]interface{}{
 		"success":     true,
@@ -163,6 +164,7 @@ func (s *Server) HandleMFAVerify(w http.ResponseWriter, r *http.Request) {
 		session.SaveCookies(s.client)
 		s.client.SetHeader("Token", session.Get().Token)
 		s.engine.SetClient(s.client)
+	session.EnableAutoRelogin(s.client, func(c *resty.Client) error { return auth.ReloginIfNeeded(c) })
 		writeJSON(w, 200, map[string]interface{}{
 			"success":     true,
 			"studentCode": session.Get().StudentCode,
@@ -181,6 +183,7 @@ func (s *Server) HandleMFAVerify(w http.ResponseWriter, r *http.Request) {
 	session.SaveCookies(s.client)
 	s.client.SetHeader("Token", session.Get().Token)
 	s.engine.SetClient(s.client)
+	session.EnableAutoRelogin(s.client, func(c *resty.Client) error { return auth.ReloginIfNeeded(c) })
 
 	writeJSON(w, 200, map[string]interface{}{
 		"success":     true,
@@ -214,6 +217,7 @@ func (s *Server) HandleChooseAccount(w http.ResponseWriter, r *http.Request) {
 		client.SetHeader("Token", session.Get().Token)
 	s.client = client
 		s.engine.SetClient(client)
+	session.EnableAutoRelogin(s.client, func(c *resty.Client) error { return auth.ReloginIfNeeded(c) })
 	writeJSON(w, 200, map[string]interface{}{
 		"success":     true,
 		"studentCode": session.Get().StudentCode,
@@ -366,6 +370,7 @@ func (s *Server) HandleRelogin(w http.ResponseWriter, r *http.Request) {
 		client.SetHeader("Token", session.Get().Token)
 	s.client = client
 		s.engine.SetClient(client)
+	session.EnableAutoRelogin(s.client, func(c *resty.Client) error { return auth.ReloginIfNeeded(c) })
 	writeJSON(w, 200, map[string]string{"status": "ok"})
 }
 

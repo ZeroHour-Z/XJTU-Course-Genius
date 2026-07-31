@@ -1,8 +1,8 @@
 ; XJTU Course Genius — Inno Setup Script
-; v4.5.2: Windows config to %APPDATA%, data dir docs
+; v4.6.0: auto-relogin on session expiry for all xkfw API calls
 
 #define MyAppName "XJTU Course Genius"
-#define MyAppVersion "4.5.2"
+#define MyAppVersion "4.6.0"
 #define MyAppPublisher "Hz"
 #define MyAppExeName "xjtu_course_genius.exe"
 

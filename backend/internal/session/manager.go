@@ -1,10 +1,12 @@
 package session
 
 import (
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,4 +142,100 @@ func SetFpVisitorID(id string) {
 	state.mu.Lock()
 	state.FpVisitorID = id
 	state.mu.Unlock()
+}
+
+// ── Auto-relogin interceptor ──
+
+// ReloginFunc is called when the session expires during an API call.
+type ReloginFunc func(client *resty.Client) error
+
+// EnableAutoRelogin adds an OnAfterResponse interceptor that detects session
+// expiry (xkfw API returns HTML instead of JSON) and automatically re-logs in
+// then retries the original request.
+//
+// Detection: body starts with '<' AND the original request URL contains
+// "/xsxkapp/*default/index.do") was an API call expecting JSON. Also matches /xsxkapp/sys/xsxkapp/elective/..." (i.e. it was an API call expecting JSON).
+// CAS login flow uses raw http.Client, not resty, so it never triggers.
+//
+// Backoff: if two relogin attempts happen within 30 seconds, the request
+// is failed immediately to prevent infinite loops.
+func EnableAutoRelogin(client *resty.Client, relogin ReloginFunc) {
+	var mu sync.Mutex
+	var inProgress bool
+	var lastRelogin time.Time
+
+	client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
+		body := resp.Body()
+		if len(body) == 0 || body[0] != '<' {
+			return nil
+		}
+
+		// Check the original request URL (before redirects). When xkfw
+		// redirects to CAS, resp.Request.URL is login.xjtu.edu.cn but
+		// the original request was to xkfw.
+		origURL := resp.Request.URL
+		if resp.Request.RawRequest != nil {
+			origURL = resp.Request.RawRequest.URL.String()
+		}
+		if !strings.Contains(origURL, "/xsxkapp/sys/xsxkapp/") {
+			return nil
+		}
+
+		mu.Lock()
+		if inProgress {
+			mu.Unlock()
+			return nil
+		}
+		if time.Since(lastRelogin) < 30*time.Second {
+			mu.Unlock()
+			return fmt.Errorf("会话已过期，重新登录失败")
+		}
+		inProgress = true
+		mu.Unlock()
+
+		defer func() {
+			mu.Lock()
+			inProgress = false
+			mu.Unlock()
+		}()
+
+		// Re-login
+		if err := relogin(c); err != nil {
+			mu.Lock()
+			lastRelogin = time.Now()
+			mu.Unlock()
+			return fmt.Errorf("自动重新登录失败: %w", err)
+		}
+
+		// Replay the original request with fresh token
+		r := c.R()
+		if rawReq := resp.Request.RawRequest; rawReq != nil {
+			for k, vals := range rawReq.Header {
+				for _, v := range vals {
+					r.SetHeader(k, v)
+				}
+			}
+			r.SetQueryString(rawReq.URL.RawQuery)
+			r.Method = rawReq.Method
+			r.URL = rawReq.URL.String()
+		}
+
+		retryResp, reErr := r.Execute(r.Method, r.URL)
+		if reErr != nil {
+			mu.Lock()
+			lastRelogin = time.Now()
+			mu.Unlock()
+			return reErr
+		}
+		if retryResp.Body()[0] == '<' {
+			mu.Lock()
+			lastRelogin = time.Now()
+			mu.Unlock()
+			return fmt.Errorf("会话已过期，重新登录后仍失败")
+		}
+
+		resp.RawResponse = retryResp.RawResponse
+		resp.SetBody(retryResp.Body())
+		return nil
+	})
 }
